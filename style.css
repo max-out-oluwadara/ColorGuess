@@ -7,11 +7,13 @@
   
   body {
     background-color: #f0f0f0;
-    min-height: 100vh;
+    /* Use 100vh instead of min-height to center properly */
+    height: 100vh;
     display: flex;
     justify-content: center;
     align-items: center;
-    padding: 20px;
+    /* Remove padding so container is exactly centered vertically */
+    margin: 0;
   }
   
   .container {
@@ -60,17 +62,18 @@
     color: #333;
   }
   
+  /* 3 columns, 2 rows (3×2) grid for the six color buttons */
   .color-options {
-    display: flex;
-    flex-wrap: wrap;
+    display: grid;
+    grid-template-columns: repeat(3, 1fr);
     gap: 1rem;
-    justify-content: center;
+    justify-items: center;
     margin: 1rem 0;
   }
   
+  /* Fixed size to ensure neat 3×2 arrangement without scrolling */
   .color-option-btn {
-    flex: 1 1 calc(33.333% - 1rem);
-    min-width: 100px;
+    width: 100px;
     height: 80px;
     border: none;
     border-radius: 8px;
@@ -122,31 +125,35 @@
     animation: wrong 0.5s ease;
   }
   
+  /* Optional: Adjust for smaller screens. */
   @media (max-width: 768px) {
     .container {
       padding: 1rem;
     }
-  
     .title {
       font-size: 1.5rem;
     }
-  
     .sub-title {
       font-size: 0.9rem;
     }
-  
     .color-box {
       height: 150px;
-    }
-  
-    .color-option-btn {
-      flex: 1 1 calc(50% - 1rem);
-      height: 70px;
     }
   }
   
   @media (max-width: 480px) {
+    /*
+    If you want to keep 3 columns even on the smallest screens,
+    you can comment out or remove the code below.
+    */
+    /*
+    .color-options {
+      grid-template-columns: repeat(2, 1fr);
+    }
+    */
     .color-option-btn {
-      flex: 1 1 100%;
+      width: 80px;
+      height: 60px;
     }
   }
+  
