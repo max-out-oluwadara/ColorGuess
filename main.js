@@ -1,18 +1,76 @@
-const NUM_OPTIONS = 6; // number of color buttons shown each round
-let targetColor = '';
-let score = 0;
+const colorBox = document.querySelector('[data-testid="colorBox"]');
+const colorOptionsContainer = document.querySelector('[data-testid="colorOptions"]');
+const gameStatus = document.querySelector('[data-testid="gameStatus"]');
+const scoreElement = document.querySelector('[data-testid="score"]');
+const newGameButton = document.querySelector('[data-testid="newGameButton"]');
 
-// Generates a random hex color, e.g. "#A1B2C3"
-function generateRandomColor() {
-  const letters = '0123456789ABCDEF';
-  let color = '#';
-  for (let i = 0; i < 6; i++) {
-    color += letters[Math.floor(Math.random() * 16)];
-  }
-  return color;
+let score = 0;
+let targetColor;
+
+// 1) Basic random color
+function getRandomColor() {
+  const r = Math.floor(Math.random() * 256);
+  const g = Math.floor(Math.random() * 256);
+  const b = Math.floor(Math.random() * 256);
+  return `rgb(${r}, ${g}, ${b})`;
 }
 
-// Shuffle array in place
+/**
+ * 2) Generate 'count' colors that are:
+ *    - All fairly distant from the baseColor
+ *    - Also spaced out from each other
+ *
+ *    You can adjust MIN_DISTANCE_BASE_TARGET if you need them
+ *    even more (or less) distinct from the base color.
+ *    You can adjust MIN_DISTANCE_EACH_OTHER if you want them
+ *    to be more or less distinct from each other.
+ */
+function generateDistinctColors(baseColor, count) {
+  const colorRegex = /rgb\((\d+),\s*(\d+),\s*(\d+)\)/;
+  const [, baseR, baseG, baseB] = baseColor.match(colorRegex).map(Number);
+
+  // Larger → bigger gap from base color
+  const MIN_DISTANCE_BASE_TARGET = 30000; 
+  // Larger → bigger gap among the distractors themselves
+  const MIN_DISTANCE_EACH_OTHER = 10000;  
+
+  function distanceSquared(r1, g1, b1, r2, g2, b2) {
+    return (r1 - r2) ** 2 + (g1 - g2) ** 2 + (b1 - b2) ** 2;
+  }
+
+  const result = [];
+
+  // Keep generating colors until we have 'count' that satisfy both conditions
+  while (result.length < count) {
+    const r = Math.floor(Math.random() * 256);
+    const g = Math.floor(Math.random() * 256);
+    const b = Math.floor(Math.random() * 256);
+
+    // Check distance from base color
+    const distFromBase = distanceSquared(r, g, b, baseR, baseG, baseB);
+    if (distFromBase < MIN_DISTANCE_BASE_TARGET) {
+      continue; // too close to the target color
+    }
+
+    // Check distance from all already-chosen colors
+    let tooCloseToOthers = false;
+    for (const existingColor of result) {
+      const [_, exR, exG, exB] = existingColor.match(colorRegex).map(Number);
+      if (distanceSquared(r, g, b, exR, exG, exB) < MIN_DISTANCE_EACH_OTHER) {
+        tooCloseToOthers = true;
+        break;
+      }
+    }
+
+    if (!tooCloseToOthers) {
+      // Good color, push to array
+      result.push(`rgb(${r}, ${g}, ${b})`);
+    }
+  }
+
+  return result;
+}
+
 function shuffleArray(array) {
   for (let i = array.length - 1; i > 0; i--) {
     const j = Math.floor(Math.random() * (i + 1));
@@ -21,88 +79,64 @@ function shuffleArray(array) {
   return array;
 }
 
-// Initialize a single game round
-function initGame() {
-  // Generate the target color
-  targetColor = generateRandomColor();
-  document.querySelector('[data-testid="colorBox"]').style.backgroundColor = targetColor;
+function updateScore() {
+  scoreElement.textContent = score;
+}
 
-  // Generate an array of random colors (including the correct one)
-  let colorOptions = [targetColor];
-  while (colorOptions.length < NUM_OPTIONS) {
-    const randCol = generateRandomColor();
-    // Avoid duplicates
-    if (!colorOptions.includes(randCol)) {
-      colorOptions.push(randCol);
-    }
-  }
+function createNewRound() {
+  // Target color
+  targetColor = getRandomColor();
+  colorBox.style.backgroundColor = targetColor;
 
-  // Shuffle color options
-  shuffleArray(colorOptions);
+  // Generate 5 distinct distractors
+  const distinctColors = generateDistinctColors(targetColor, 5);
+  // Combine them with the target color & shuffle
+  const allColors = shuffleArray([...distinctColors, targetColor]);
 
-  // Render buttons
-  const optionsContainer = document.querySelector('[data-testid="colorOptions"]');
-  optionsContainer.innerHTML = ''; // clear old buttons
+  colorOptionsContainer.innerHTML = '';
 
-  colorOptions.forEach(col => {
-    const btn = document.createElement('button');
-    btn.classList.add('color-btn');
-    btn.dataset.color = col;
-    btn.style.backgroundColor = col;
-    btn.addEventListener('click', handleGuess);
-    optionsContainer.appendChild(btn);
+  allColors.forEach(color => {
+    const button = document.createElement('button');
+    button.className = 'color-option-btn';
+    button.style.backgroundColor = color;
+    button.dataset.color = color;
+    button.addEventListener('click', handleGuess);
+    colorOptionsContainer.appendChild(button);
   });
 
-  // Reset the game status message
-  const gameStatus = document.querySelector('[data-testid="gameStatus"]');
-  gameStatus.textContent = '';
-  gameStatus.classList.remove('correct', 'wrong');
+  gameStatus.textContent = 'Guess the correct color!';
+  gameStatus.style.color = '#333';
 }
 
-// Handle user guess
 function handleGuess(e) {
-  const guessedColor = e.target.dataset.color;
-  const gameStatus = document.querySelector('[data-testid="gameStatus"]');
+  const selectedColor = e.target.dataset.color;
 
-  if (guessedColor === targetColor) {
-    // Correct guess
+  if (selectedColor === targetColor) {
     score++;
-    document.querySelector('[data-testid="score"]').textContent = score.toString();
-
-    gameStatus.textContent = 'Correct! Well done!';
-    gameStatus.classList.remove('wrong');
-    gameStatus.classList.add('correct');
-
-    // Celebrate animation on the correct button
-    e.target.classList.add('celebrate');
-    setTimeout(() => {
-      e.target.classList.remove('celebrate');
-      initGame(); // next round
-    }, 500);
-
+    updateScore();
+    gameStatus.textContent = 'Correct! Well done! 🎉';
+    gameStatus.style.color = '#4CAF50';
+    e.target.classList.add('correct');
+    setTimeout(createNewRound, 1000);
   } else {
-    // Wrong guess
-    gameStatus.textContent = 'Wrong! Try again!';
-    gameStatus.classList.remove('correct');
-    gameStatus.classList.add('wrong');
-
-    // Shake animation on the clicked button
-    e.target.classList.add('wrong-animation');
+    gameStatus.textContent = 'Wrong! Try again. 😞';
+    gameStatus.style.color = '#ff4444';
+    e.target.classList.add('wrong');
+    const correctButton = [...colorOptionsContainer.children]
+      .find(btn => btn.dataset.color === targetColor);
+    correctButton.classList.add('correct');
     setTimeout(() => {
-      e.target.classList.remove('wrong-animation');
-    }, 500);
-
-    // Disable the wrong guess button
-    e.target.disabled = true;
+      e.target.classList.remove('wrong');
+      correctButton.classList.remove('correct');
+    }, 1000);
   }
 }
 
-// New Game button resets the score and restarts
-document.querySelector('[data-testid="newGameButton"]').addEventListener('click', () => {
+newGameButton.addEventListener('click', () => {
   score = 0;
-  document.querySelector('[data-testid="score"]').textContent = '0';
-  initGame();
+  updateScore();
+  createNewRound();
 });
 
-// Start the first round
-initGame();
+// Initialize game
+createNewRound();
